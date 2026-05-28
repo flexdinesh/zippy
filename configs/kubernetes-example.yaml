@@ -1,0 +1,93 @@
+# Example Kubernetes deployment with zippy as a sidecar container
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zippy-config
+data:
+  config.yaml: |
+    schedule: "0 2 * * *"
+    sources:
+      - /data
+    destination:
+      type: local
+      path: /backups
+    retention:
+      daily: 7
+      weekly: 4
+      monthly: 12
+    compression: gzip
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-with-backup
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: myapp
+  template:
+    metadata:
+      labels:
+        app: myapp
+    spec:
+      containers:
+      # Main application container
+      - name: app
+        image: your-app:latest
+        volumeMounts:
+        - name: data
+          mountPath: /data
+
+      # Zippy backup sidecar container
+      - name: zippy
+        image: zippy:latest
+        args:
+          - "-config"
+          - "/app/config.yaml"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+          readOnly: true
+        - name: backups
+          mountPath: /backups
+        - name: config
+          mountPath: /app
+          readOnly: true
+
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: app-data
+      - name: backups
+        persistentVolumeClaim:
+          claimName: app-backups
+      - name: config
+        configMap:
+          name: zippy-config
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: app-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: app-backups
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi

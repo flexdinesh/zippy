@@ -1,0 +1,24 @@
+# Example Docker Compose configuration with zippy as a sidecar
+
+version: '3.8'
+
+services:
+  # Main application
+  app:
+    image: your-app:latest
+    volumes:
+      - app-data:/data
+    # ... your app configuration
+
+  # Zippy backup sidecar
+  zippy:
+    image: zippy:latest
+    volumes:
+      - app-data:/data:ro          # Mount app data as read-only
+      - backups:/backups            # Mount backup destination
+      - ./config.yaml:/app/config.yaml:ro  # Mount configuration
+    restart: unless-stopped
+
+volumes:
+  app-data:
+  backups:
